@@ -39,19 +39,62 @@ const listAllMovies = async (
     isNaN(Number(req.query.page)) || Number(req.query.page) < 0
       ? 1
       : Number(req.query.page);
-
   page = page * perPage;
 
-  const query: string = `
-        SELECT
-            *
-        FROM
-            movies
-        LIMIT $1 OFFSET $2;
-    `;
+  const sort =
+    req.query.sort?.toString().toLowerCase() === "price" ||
+    req.query.sort === "duration"
+      ? req.query.sort
+      : "";
+  const order =
+    req.query.order?.toString().toLowerCase() === "asc" ||
+    req.query.order === "desc"
+      ? req.query.order
+      : "";
+
+  let queryString: string = format(
+    `
+      SELECT
+          *
+      FROM
+          movies
+      LIMIT $1 OFFSET $2;
+  `,
+    sort
+  );
+
+  if (sort !== "") {
+    queryString = format(
+      `
+      SELECT
+          *
+      FROM
+          movies
+      ORDER BY 
+          %s asc
+      LIMIT $1 OFFSET $2;
+  `,
+      sort
+    );
+  }
+
+  if (order === "desc" && sort !== "") {
+    queryString = format(
+      `
+      SELECT
+          *
+      FROM
+          movies
+      ORDER BY 
+          %s  desc
+      LIMIT $1 OFFSET $2;
+  `,
+      sort
+    );
+  }
 
   const queryConfig: QueryConfig = {
-    text: query,
+    text: queryString,
     values: [perPage, page],
   };
 
@@ -60,10 +103,10 @@ const listAllMovies = async (
 
   const nextPageFunction = () => {
     const nextPage = `http://localhost:3000/movies?page=${
-      page + 1
+      page / perPage + 1
     }&perPage${perPage}`;
 
-    if (data.length === 0) {
+    if (data.length <= 4) {
       const nextPage = null;
       return nextPage;
     }
@@ -71,10 +114,10 @@ const listAllMovies = async (
   };
   const previusPageFunction = () => {
     const previusPage = `http://localhost:3000/movies?page=${
-      page - 1
+      page / perPage - 1
     }&perPage${perPage}`;
 
-    if (data.length === 0) {
+    if (page <= 0) {
       const previusPage = null;
       return previusPage;
     }
